@@ -1,16 +1,27 @@
 'use strict';
 const express = require('express');
 const router = express.Router();
+const { param, body, validationResult } = require('express-validator');
 const authenticationEnsurer = require('./authentication-ensurer');
 const { v4: uuidv4 } = require('uuid');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient({ log: [ 'query' ] });
 
 router.get('/new', authenticationEnsurer, (req, res, next) => {
-  res.render('new', { user: req.user });
+  res.render('new', { user: req.user, csrfToken: req.csrfToken() });
 });
 
 router.post('/', authenticationEnsurer, async (req, res, next) => {
+  await body('scheduleName').isString().run(req);
+  await body('candidates').isString().run(req);
+  await body('memo').isString().run(req);
+  const errors = validationResult(req);
+
+  if (!errors.isEmpty()) {
+    const error = new Error('入力された情報が不十分または正しくありません。');
+    error.status = 400;
+    return next(error);
+  }
   const scheduleId = uuidv4();
   const updatedAt = new Date();
   const schedule = await prisma.schedule.create({
@@ -26,6 +37,14 @@ router.post('/', authenticationEnsurer, async (req, res, next) => {
 });
 
 router.get('/:scheduleId', authenticationEnsurer, async (req, res, next) => {
+  await param('scheduleId').isUUID('4').run(req);
+  const errors = validationResult(req);
+
+  if (!errors.isEmpty()) {
+    const err = new Error('URL の形式が正しくありません。');
+    err.status = 400;
+    return next(err);
+  }
   const schedule = await prisma.schedule.findUnique({
     where: { scheduleId: req.params.scheduleId },
     include: {
@@ -114,6 +133,15 @@ router.get('/:scheduleId', authenticationEnsurer, async (req, res, next) => {
 });
 
 router.get('/:scheduleId/edit', authenticationEnsurer, async (req, res, next) => {
+  await param('scheduleId').isUUID('4').run(req);
+  const errors = validationResult(req);
+
+  if (!errors.isEmpty()) {
+    const err = new Error('URL の形式が正しくありません。');
+    err.status = 400;
+    return next(err);
+  }
+
   const schedule = await prisma.schedule.findUnique({
     where: { scheduleId: req.params.scheduleId }
   });
@@ -125,7 +153,8 @@ router.get('/:scheduleId/edit', authenticationEnsurer, async (req, res, next) =>
     res.render('edit', {
       user: req.user,
       schedule: schedule,
-      candidates: candidates
+      candidates: candidates,
+      csrfToken: req.csrfToken()
     });
   } else {
     const err = new Error('指定された予定がない、または、予定する権限がありません');
@@ -139,6 +168,18 @@ function isMine(req, schedule) {
 }
 
 router.post('/:scheduleId/update', authenticationEnsurer, async (req, res, next) => {
+  await param('scheduleId').isUUID('4').run(req);
+  await body('scheduleName').isString().run(req);
+  await body('candidates').isString().run(req);
+  await body('memo').isString().run(req);
+  const errors = validationResult(req);
+
+  if (!errors.isEmpty()) {
+    const err = new Error('URL の形式が正しくないか、入力された情報が不十分または正しくありません。');
+    err.status = 400;
+    return next(err);
+  }
+
   let schedule = await prisma.schedule.findUnique({
     where: { scheduleId: req.params.scheduleId }
   });
@@ -167,6 +208,15 @@ router.post('/:scheduleId/update', authenticationEnsurer, async (req, res, next)
 });
 
 router.post('/:scheduleId/delete', authenticationEnsurer, async (req, res, next) => {
+  await param('scheduleId').isUUID('4').run(req);
+  const errors = validationResult(req);
+
+  if (!errors.isEmpty()) {
+    const err = new Error('URL の形式が正しくありません。');
+    err.status = 400;
+    return next(err);
+  }
+
   const schedule = await prisma.schedule.findUnique({
     where: { scheduleId: req.params.scheduleId }
   });
